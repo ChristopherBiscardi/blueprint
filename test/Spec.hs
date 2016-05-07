@@ -33,10 +33,13 @@ parserTests = do
              Success a -> fail "Should not be able to parse this"
              Failure doc -> True `shouldBe` True
 
+ff = Field Nothing "hero" Nothing Nothing (Just $ [Field Nothing "name" Nothing Nothing Nothing])
+
 blueprintTests :: Spec
 blueprintTests = do
   describe ".parse" $ do
     it "parses a simple query" $ do
       case BP.parseGraphQL "query HeroNameQuery {hero {name}}" of
         Success a -> a `shouldBe` Document [
-          OperationDefinition QUERY (Just $ Name "HeroNameQuery") Nothing (Just []) (SelectionSet [])]
+          OperationDefinition QUERY (Just $ Name "HeroNameQuery") Nothing Nothing [ff]]
+        Failure a -> putStrLn $ show a

@@ -13,9 +13,6 @@ newtype FragmentName = FragmentName Name
 -- | fragment on $Name, where $Name is the TypeCondition
 newtype TypeCondition = TypeCondition Name
   deriving (Eq, Show)
-newtype Alias = Alias Name
-  deriving (Eq, Show)
-
 
 newtype Document = Document [Definition] deriving (Eq, Show);
 
@@ -55,16 +52,13 @@ data Value = Variable
            | ObjectValue
              deriving (Eq, Show)
 
-data SelectionSet = SelectionSet [Selection] deriving (Eq, Show)
-data Selection = Selection Field FragmentSpread InlineFragment
-  deriving (Eq, Show)
-data Field = Field { fAlias :: Maybe Alias
-                   , fName :: Maybe Name
-                   , fArgs :: [Argument]
-                   , fDirectives :: [Directive]
-                   , fSelectionSet :: Maybe SelectionSet
-                   } deriving (Eq, Show)
-data FragmentSpread = FragmentSpread FragmentName [Directive]
-  deriving (Eq, Show)
-data InlineFragment = InlineFragment TypeCondition [Directive] SelectionSet
-  deriving (Eq, Show)
+type SelectionSet = [Selection]
+data Selection = Field { fAlias :: Maybe Name
+                       , fName :: Name
+                       , fArgs :: Maybe [Argument]
+                       , fDirectives :: Maybe [Directive]
+                       , fSelectionSet :: Maybe SelectionSet
+                       }
+               | FragmentSpread FragmentName (Maybe [Directive])
+               | InlineFragment TypeCondition (Maybe [Directive]) SelectionSet
+               deriving (Eq, Show)

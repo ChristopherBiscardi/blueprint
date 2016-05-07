@@ -12,6 +12,11 @@ import Text.Trifecta.Delta
 
 import qualified Blueprint.AST as AST
 
+discardWhitespace :: Parser ()
+discardWhitespace = do
+  _ <- many gSpace
+  return ()
+
 parseGraphQL :: String -> Result AST.Document
 parseGraphQL = parseString graphql (Columns 0 0)
 
@@ -24,12 +29,42 @@ definition = operationDefinition -- <|> fragmentDefinition
 operationDefinition :: Parser AST.Definition
 operationDefinition = do
   opType <- operationType
-  name'' <- optional name
+  discardWhitespace
+  name' <- optional name
+  discardWhitespace
   selectionSet' <- selectionSet
-  return $ AST.OperationDefinition opType name'' Nothing Nothing selectionSet'
+  return $ AST.OperationDefinition opType name' Nothing Nothing selectionSet'
 
 selectionSet :: Parser AST.SelectionSet
-selectionSet = undefined
+selectionSet = braces $ many selection
+
+selection :: Parser AST.Selection
+selection = do
+  selection' <- choice [field] -- , fragmentSpread, inlineFragment
+  return selection'
+
+field :: Parser AST.Selection -- Field
+field = do
+--  alias' <- optional name
+  discardWhitespace
+  name' <- name
+  discardWhitespace
+  -- arguments' <- optional arguments
+  -- directives' <- optional directives
+  selectionSet' <- optional $ selectionSet
+  return $ AST.Field Nothing name' Nothing Nothing selectionSet'
+
+arguments :: Parser [AST.Argument]
+arguments = undefined
+
+directives :: Parser [AST.Directive]
+directives = undefined
+
+fragmentSpread :: Parser AST.Selection -- FragmentSpread
+fragmentSpread = undefined
+
+inlineFragment :: Parser AST.Selection -- InlineFragment
+inlineFragment = undefined
 
 -- fragmentDefinition :: Parser FragmentDefinition
 -- fragmentDefinition = undefined
@@ -42,7 +77,7 @@ operationType = do
   case op of
     "query" -> return AST.QUERY
     "mutation" -> return AST.MUTATION
-    _ -> fail "op must be query or mutation"
+    _ -> fail "operation must be `query` or `mutation`"
 
 -- | names can start with _ or letters
 --   The rest can be any alphanumeric [char]
