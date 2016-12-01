@@ -57,7 +57,7 @@ data Selection = Field { fAlias :: Maybe Name
                        , fName :: Name
                        , fArgs :: Maybe [Argument]
                        , fDirectives :: Maybe [Directive]
-                       , fSelectionSet :: Maybe SelectionSet
+                       , fSelectionSet :: SelectionSet
                        }
                | FragmentSpread FragmentName (Maybe [Directive])
                | InlineFragment TypeCondition (Maybe [Directive]) SelectionSet

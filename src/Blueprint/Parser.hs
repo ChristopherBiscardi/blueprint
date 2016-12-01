@@ -2,13 +2,14 @@
 
 module Blueprint.Parser where
 
-import Control.Applicative ((<|>))
-import Data.Char (chr)
-import Data.String (IsString)
-import Data.Text (Text)
-import Text.Parser.Char
-import Text.Trifecta
-import Text.Trifecta.Delta
+import           Control.Applicative ((<|>))
+import           Data.Char (chr)
+import           Data.Maybe (fromMaybe)
+
+import           Data.Text (Text)
+import           Text.Parser.Char
+import           Text.Trifecta
+import           Text.Trifecta.Delta
 
 import qualified Blueprint.AST as AST
 
@@ -20,14 +21,24 @@ discardWhitespace = do
 parseGraphQL :: String -> Result AST.Document
 parseGraphQL = parseString graphql (Columns 0 0)
 
+-- | A valid Document must have one or more definitions
 graphql :: Parser AST.Document
-graphql = AST.Document <$> many definition
+graphql = AST.Document <$> some definition
 
 definition :: Parser AST.Definition
 definition = operationDefinition -- <|> fragmentDefinition
 
 operationDefinition :: Parser AST.Definition
-operationDefinition = do
+operationDefinition = opSelectionSet <|> opDef
+
+opSelectionSet :: Parser AST.Definition
+opSelectionSet = do
+  set <- selectionSet
+  return $ AST.OperationDefinition AST.QUERY Nothing Nothing Nothing set
+
+opDef :: Parser AST.Definition
+opDef = do
+  -- | default to QUERY if not specified
   opType <- operationType
   discardWhitespace
   name' <- optional name
@@ -51,7 +62,7 @@ field = do
   discardWhitespace
   -- arguments' <- optional arguments
   -- directives' <- optional directives
-  selectionSet' <- optional $ selectionSet
+  selectionSet' <- fromMaybe [] <$> optional selectionSet
   return $ AST.Field Nothing name' Nothing Nothing selectionSet'
 
 arguments :: Parser [AST.Argument]
@@ -82,7 +93,7 @@ operationType = do
 -- | names can start with _ or letters
 --   The rest can be any alphanumeric [char]
 name :: Parser AST.Name
-name = do
+name = (<?> "GraphQL Name") $ do
   prefixChar <- char '_' <|> letter
   rest <- many alphaNum
   return $ AST.Name $ [prefixChar] ++ rest

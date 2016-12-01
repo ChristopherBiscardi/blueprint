@@ -1,11 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import           Blueprint.AST
-import qualified Blueprint.Parser as BP
 import           Test.Hspec.Core.Spec (fromSpecList)
 import           Test.Tasty.Hspec
 import           Text.Trifecta
 import           Text.Trifecta.Delta
+import           Text.Trifecta.Result
+import Text.PrettyPrint.ANSI.Leijen (putDoc)
+
+import           Blueprint.AST
+import qualified Blueprint.Parser as BP
+import SchemaParser (schemaParserTests)
 
 main :: IO ()
 main = hspec $ do
@@ -14,9 +18,12 @@ main = hspec $ do
 
 startOfLine = Columns 0 0
 
-parserTests :: Spec
 parserTests = do
-    describe ".name" $ do
+  describe ".name" nameParserTests
+  describe ".schema-language" schemaParserTests
+
+nameParserTests :: Spec
+nameParserTests = do
       it "accepts a single char" $ do
          let res = parseString BP.name startOfLine "_"
          case res of
@@ -31,15 +38,37 @@ parserTests = do
          let res = parseString BP.name startOfLine "8test"
          case res of
              Success a -> fail "Should not be able to parse this"
-             Failure doc -> True `shouldBe` True
+             Failure _doc -> True `shouldBe` True
 
-ff = Field Nothing "hero" Nothing Nothing (Just $ [Field Nothing "name" Nothing Nothing Nothing])
+ff = Field Nothing "hero" Nothing Nothing [Field Nothing "name" Nothing Nothing []]
 
 blueprintTests :: Spec
 blueprintTests = do
   describe ".parse" $ do
-    it "parses a simple query" $ do
+    it "parses `query HeroNameQuery {hero {name}}`" $ do
       case BP.parseGraphQL "query HeroNameQuery {hero {name}}" of
         Success a -> a `shouldBe` Document [
           OperationDefinition QUERY (Just $ Name "HeroNameQuery") Nothing Nothing [ff]]
-        Failure a -> putStrLn $ show a
+        Failure a -> fail $ show a
+    it "parses `{ hero { name } }`" $ do
+      case BP.parseGraphQL "{ hero { name } }" of
+        Success a -> a `shouldBe` Document [
+          OperationDefinition QUERY Nothing Nothing Nothing [ff]]
+        Failure a -> fail $ show a
+    it "parses `query {hero {name }}" $ do
+      case BP.parseGraphQL "query {hero {name }}" of
+        Success a -> a `shouldBe` Document [
+          OperationDefinition QUERY Nothing Nothing Nothing [ff]]
+        Failure a -> fail $ show a
+    it "parses `query {hero {name}}" $ do
+      case BP.parseGraphQL "query {hero {name}}" of
+        Success a -> a `shouldBe` Document [
+          OperationDefinition QUERY Nothing Nothing Nothing [ff]]
+        Failure a -> fail $ show a
+    -- | TODO: can we make this error message nicer via formatting?
+    describe "error messages" $ do
+      it "errors on faulty opTypes" $ do
+        case BP.parseGraphQL "finagle Name {hero {name}}" of
+          Success a -> fail $ show a
+          Failure (ErrInfo a b) -> True `shouldBe` True
+

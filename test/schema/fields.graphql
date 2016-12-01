@@ -1,0 +1,2 @@
+  hero(episode: Episode): Character
+  droid(id: ID!): Droid

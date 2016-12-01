@@ -19,16 +19,31 @@ library
                      , Blueprint.Parser
                      , Blueprint.AST
                      , Blueprint.GraphQL
+                     , Blueprint.FreeHaxl
+                     , Blueprint.Schema
   build-depends:       base >= 4.7 && < 5
                      , text >= 1.2.2.0
                      , trifecta >= 1.5.2
                      , parsers >= 0.12.3
+                     , containers
+                     , aeson
+                       -- haxl
+                     , hashable
+                     , haxl
+                     , async
+                     , conduit
+                     , resourcet
+                     , http-conduit
+                     , http-client-tls
+                     , fb
+                     , template-haskell
+                     , lens
   default-language:    Haskell2010
 
 executable blueprint-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
                      , blueprint
   default-language:    Haskell2010
@@ -37,14 +52,18 @@ test-suite blueprint-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
+  additional-modules:
+                       SchemaParser
   build-depends:       base
                      , blueprint
-                     , tasty == 0.11.0.2
+                     , containers
+                     , tasty
                      , tasty-hspec
                      , tasty-quickcheck
                      , trifecta
                      , hspec-core
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+                     , ansi-wl-pprint
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   default-language:    Haskell2010
 
 source-repository head

@@ -2,13 +2,18 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration/
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-5.6
+resolver: nightly-2016-07-11
 
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
+- location:
+    git: git@github.com:facebook/Haxl.git
+    commit: bff7b643f545679a7597670ee20976884f03591b
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
-extra-deps: []
+extra-deps: [
+  trifecta-1.6
+]
 
 # Override default flag values for local packages and extra-deps
 flags: {}
