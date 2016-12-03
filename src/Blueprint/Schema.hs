@@ -9,6 +9,9 @@ import Data.String (IsString(..))
 import Control.Applicative ((<|>))
 import Control.Lens
 import Data.Either (rights, lefts)
+import Data.Maybe (catMaybes)
+import Data.List (intercalate)
+
 
 import qualified Blueprint.Parser as BP
 import qualified Blueprint.AST as AST
@@ -41,23 +44,28 @@ makeLenses ''GraphQLObject
 makeLenses ''GraphQLFieldConfig
 makeLenses ''GraphQLArgumentConfig
 
+parseSchemaFromFile :: String -> IO (Either [String] [GraphQLObject])
+parseSchemaFromFile filepath = do
+  graphqlString <- readFile filepath
+  return $ schemaParser graphqlString
+
 parseSchema :: String -> Result [GraphQLObject]
 parseSchema = parseString typesParser (Columns 0 0)
 
 isBaseScalar :: String -> Bool
 isBaseScalar dep = dep `elem` ["String"]
 
-schemaParser :: String -> [Either String [GraphQLObject]]
+schemaParser :: String -> Either [String] [GraphQLObject]
 schemaParser str = do
   case parseSchema str of
-    Failure aDoc -> Left $ show aDoc
+    Failure aDoc -> Left [show aDoc]
     Success types -> do
-      let typeNames = map (name) types
-          validations = traverse (typeHasAllDependencies typeNames) types
-          errorsList = lefts validations
-      case length errorsList /= 0 of
-        True -> errorsList
-        False -> rights validations
+      let typeNames = types^..traverse.name
+          maybeErrorsList = catMaybes $ map (typeHasAllDependencies typeNames) types
+          list = foldr (++) [] maybeErrorsList
+      case length list /= 0 of
+          True -> Left list
+          False -> Right types
 
 -- | Given a GraphQLType definition, make sure all dependencies of
 --   said type have their own definitions.
@@ -67,24 +75,21 @@ type TypeName = String
 typeHasAllDependencies :: DefinedGraphQLTypes -> GraphQLObject -> Maybe [ErrorMessage]
 typeHasAllDependencies typeNames (GraphQLObject name' fields' _) = do
   let dependentTypes = concatMap getDependentTypes (Map.elems fields')
-      errors = map (\(Just s) -> "GraphQL Type " ++ name' ++ " has unfufilled dependencies " ++ show dependency) (catMaybes dependentTypes)
---      dependencies = map (fieldsExist typeNames) (Map.elems fields')
-  return undefined
+      invalidTypes = filter (not . flip isDefinedType typeNames) dependentTypes
+      errors = map unfufilledDepError invalidTypes
+  case errors of
+    [] -> Nothing
+    _ -> Just errors
   where
     -- | TypeName exists as a defined type or as a base Scalar
-    isDefinedType :: TypeName -> [DefinedGraphQLTypes] -> Bool
-    isDefinedType depName typeNames = depName `elem` typeNames || isBaseScalar depName
-    fieldsExist :: [DefinedGraphQLTypes] -> GraphQLFieldConfig -> Maybe TypeName
-    fieldsExist types (GraphQLFieldConfig dependencyName _ _ _) =
-      case isDefinedType (getName dependencyName) types of
-        True -> Nothing
-        False -> Just dependencyName
+    isDefinedType :: TypeName -> DefinedGraphQLTypes -> Bool
+    isDefinedType depName typeNames' = elem depName typeNames' || isBaseScalar depName
     -- | Get a list of all types our current type depends on
     getDependentTypes :: GraphQLFieldConfig -> [String]
-    getDependentTypes (GraphQLFieldConfig outputType args _ _) = do
-      let t = args^..traverse.acType :: [GraphQLInputType]
-      return $ map (\(GraphQLInputType n) -> n) t
+    getDependentTypes (GraphQLFieldConfig (GraphQLOutputType outputType) args _ _)
+      = [outputType] ++ map (\(GraphQLInputType n) -> n) (args^..traverse.acType)
     getName (GraphQLOutputType str) = str
+    unfufilledDepError dependency = intercalate " " ["GraphQL Type", name', "has unfufilled dependency", show dependency]
 
 typesParser :: Parser [GraphQLObject]
 typesParser = some graphqlTypeParser

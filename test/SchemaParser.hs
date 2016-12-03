@@ -6,6 +6,7 @@ import           Test.Tasty.Hspec
 import           Text.Trifecta
 import           Text.Trifecta.Delta
 import           Text.Trifecta.Result
+import Control.Lens
 
 import           Blueprint.AST
 import qualified Blueprint.Schema as S
@@ -29,7 +30,7 @@ schemaParserTests = do
       it "parses multiple fields" $ do
          res <- parseFromFileEx S.fieldsParser "test/schema/fields.graphql"
          case res of
-             Success a -> a `shouldBe` (S.fields heroQueryType)
+             Success a -> a `shouldBe` (heroQueryType^.S.fields)
              Failure xs -> fail $ show xs
       it "parses a basic type" $ do
          res <- parseFromFileEx S.graphqlTypeParser "test/schema/type.graphql"
@@ -54,22 +55,33 @@ schemaParserTests = do
                                        , simpleType "Droid"
                                        ]
              Failure xs -> fail $ show xs
-      it "parses a basic Schema" $ do
-         res <- parseFromFileEx S.schemaParser "test/schema/basic-schema.graphql"
+      it "parses syntax for a basic Schema" $ do
+         graphqlString <- readFile "test/schema/basic-schema.graphql"
+         let res = S.parseSchema graphqlString
          case res of
              Success a -> a `shouldBe` [ heroQueryType
                                        , simpleType "Character"
                                        , simpleType "Droid"
                                        ]
              Failure xs -> fail $ show xs
-      it "fails to parse a basic Schema with a missing type" $ do
-         res <- parseFromFileEx S.schemaParser "test/schema/basic-schema-missing-type.graphql"
-         case res of
-             Success a -> a `shouldBe` [ heroQueryType
-                                       , simpleType "Character"
-                                       , simpleType "Droid"
-                                       ]
-             Failure xs -> fail $ show xs
+      it "fails to parse a basic Schema with undeclared types" $ do
+         graphqlString <- readFile "test/schema/basic-schema-missing-type.graphql"
+         case S.schemaParser graphqlString of
+           Left errors -> errors `shouldBe` [
+             "GraphQL Type Query has unfufilled dependency \"ID\"",
+             "GraphQL Type Query has unfufilled dependency \"Episode\"",
+             "GraphQL Type Character has unfufilled dependency \"SpecialString\""
+             ]
+           Right schema -> fail "There should be missing type errors"
+      it "fails to parse a basic Schema with undeclared types from file" $ do
+         graphqlString <- S.parseSchemaFromFile "test/schema/basic-schema-missing-type.graphql"
+         case graphqlString of
+           Left errors -> errors `shouldBe` [
+             "GraphQL Type Query has unfufilled dependency \"ID\"",
+             "GraphQL Type Query has unfufilled dependency \"Episode\"",
+             "GraphQL Type Character has unfufilled dependency \"SpecialString\""
+             ]
+           Right schema -> fail "There should be missing type errors"
 
 
 -- | test a parser against a string to equal a result
@@ -85,45 +97,30 @@ bpParseTest parser string result = do
 heroQueryType :: S.GraphQLObject
 heroQueryType = S.GraphQLObject "Query" (Map.fromList [
   ("hero", S.GraphQLFieldConfig
-     { S.fType="Character"
-     , S.fArgs=Map.fromList [
+     { S._fType="Character"
+     , S._fArgs=Map.fromList [
       ("episode", S.GraphQLArgumentConfig "Episode" Nothing Nothing)
       ]
-     , S.fDeprecationReason=Nothing
-     , S.fDescription=Nothing
+     , S._fDeprecationReason=Nothing
+     , S._fDescription=Nothing
      }),
     ("droid", S.GraphQLFieldConfig
-     { S.fType="Droid"
-     , S.fArgs=Map.fromList [
+     { S._fType="Droid"
+     , S._fArgs=Map.fromList [
       ("id", S.GraphQLArgumentConfig "ID" Nothing Nothing)
       ]
-     , S.fDeprecationReason=Nothing
-     , S.fDescription=Nothing
+     , S._fDeprecationReason=Nothing
+     , S._fDescription=Nothing
      })
   ]) Nothing
 
 starshipType :: S.GraphQLObject
 starshipType = S.GraphQLObject "Starship" (Map.fromList [
-  ("id", S.GraphQLFieldConfig
-     { S.fType="ID"
-     , S.fArgs=Map.empty
-     , S.fDeprecationReason=Nothing
-     , S.fDescription=Nothing
-     }),
-    ("name", S.GraphQLFieldConfig
-     { S.fType="String"
-     , S.fArgs=Map.empty
-     , S.fDeprecationReason=Nothing
-     , S.fDescription=Nothing
-     }),
-    ("length", S.GraphQLFieldConfig
-     { S.fType="Float"
-     , S.fArgs=Map.fromList [
+  ("id", S.GraphQLFieldConfig "ID" Map.empty Nothing Nothing),
+    ("name", S.GraphQLFieldConfig "String" Map.empty Nothing Nothing),
+    ("length", S.GraphQLFieldConfig "Float" (Map.fromList [
       ("unit", S.GraphQLArgumentConfig "LengthUnit" (Just "METER") Nothing)
-      ]
-     , S.fDeprecationReason=Nothing
-     , S.fDescription=Nothing
-     })
+      ]) Nothing Nothing)
   ]) Nothing
 
 -- | Helper to construct a simple GraphQLObject with a single Name field
@@ -131,11 +128,6 @@ simpleType :: String -> S.GraphQLObject
 simpleType objectName =
   S.GraphQLObject objectName
                   (Map.fromList [
-                      ("name", S.GraphQLFieldConfig
-                       { S.fType="String"
-                       , S.fArgs=Map.empty
-                       , S.fDeprecationReason=Nothing
-                       , S.fDescription=Nothing
-                       })
+                      ("name", S.GraphQLFieldConfig "String" Map.empty Nothing Nothing)
                       ])
                   Nothing

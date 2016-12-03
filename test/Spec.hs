@@ -19,8 +19,8 @@ main = hspec $ do
 startOfLine = Columns 0 0
 
 parserTests = do
-  describe ".name" nameParserTests
-  describe ".schema-language" schemaParserTests
+  describe "name" nameParserTests
+  describe "schema-language" schemaParserTests
 
 nameParserTests :: Spec
 nameParserTests = do
